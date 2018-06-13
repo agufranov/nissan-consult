@@ -1,5 +1,6 @@
 import { EventEmitter } from 'eventemitter3'
-import * as _ from 'lodash'
+
+import { Command, CommandEventType } from './Command'
 
 import { INIT, STOP } from './commands'
 import {
@@ -12,13 +13,20 @@ import {
 
 interface IPickResult {
     frame: number[]
-    type: 'command_response' | 'value' | 'error'
+    type: CommandEventType
 }
 
-export class ConsultFrameReader extends EventEmitter {
-    public command?: number[]
-    public commands: number[][] = []
+export class ConsultFrameReader extends EventEmitter<'picked'> {
+    public command: Command | undefined
+    public commands: Command[] = []
     public data: number[] = []
+
+    public enqueueCommand(bytes: number[]): Command {
+        const command: Command = new Command(bytes)
+        this.commands.push(command)
+
+        return command
+    }
 
     public processChunk(chunk: number[]): void {
         if (chunk.length === 0) { throw new Error('Empty chunk received') }
@@ -27,13 +35,12 @@ export class ConsultFrameReader extends EventEmitter {
         do {
             picked = this.pickFrame()
             if (picked) {
+                if (this.command) {
+                    this.command.emit(picked.type, picked.frame)
+                }
                 this.emit('picked', picked)
             }
         } while (picked)
-    }
-
-    private commandEquals(command: number[]): boolean {
-        return !!this.command && _.isEqual(this.command, command)
     }
 
     private pickFrame(): IPickResult | undefined {
@@ -45,25 +52,25 @@ export class ConsultFrameReader extends EventEmitter {
             const frameLength: number = this.data[1] + VALUE_FRAME_HEADER_LENGTH
             if (this.data.length < frameLength) { return undefined }
 
-            return { type: 'value', frame: this.data.splice(0, frameLength) }
+            return { type: CommandEventType.VALUE, frame: this.data.splice(0, frameLength) }
         } else if (this.data[0] === ERROR_BYTE) {
             if (!this.command) { throw new Error('Got error frame, but no current command present') }
 
-            return { type: 'error', frame: this.data.splice(1) }
+            return { type: CommandEventType.ERROR, frame: this.data.splice(1) }
         } else {
             if (this.commands.length === 0) { throw new Error('No commands in queue to process') }
             this.command = this.commands[0]
             const frameLength: number =
-                this.commandEquals(INIT)
+                this.command.equals(INIT)
                     ? this.data[0] === 0x00
                         ? INIT_RESPONSE_LENGTH
                         : INIT_FIRST_RESPONSE_LENGTH
-                    : Math.max(this.command.length - 1, 1)
+                    : Math.max(this.command.bytes.length - 1, 1)
             if (this.data.length < frameLength) { return undefined }
 
             this.commands.shift()
 
-            return { type: 'command_response', frame: this.data.splice(0, frameLength) }
+            return { type: CommandEventType.COMMAND_RESPONSE, frame: this.data.splice(0, frameLength) }
         }
     }
 }
