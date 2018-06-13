@@ -3,6 +3,7 @@
     "rules": {
         "semicolon": [true, "never"],
         "quotemark": [true, "single", "jsx-double"],
-        "prefer-function-over-method": [true, "allow-public"]
+        "prefer-function-over-method": [true, "allow-public"],
+        "no-inferrable-types": false
     }
 }
