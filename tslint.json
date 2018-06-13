@@ -1,0 +1,8 @@
+{
+    "extends": "tslint:all",
+    "rules": {
+        "semicolon": [true, "never"],
+        "quotemark": [true, "single", "jsx-double"],
+        "prefer-function-over-method": [true, "allow-public"]
+    }
+}
