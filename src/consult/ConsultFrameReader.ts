@@ -1,15 +1,17 @@
 import { Command, CommandEventType } from './Command'
 
-import { INIT, STOP } from './commands'
+import { INIT } from './commands'
 import {
     ERROR_BYTE,
     INIT_FIRST_RESPONSE_LENGTH,
     INIT_RESPONSE_LENGTH,
+    STOP_COMMAND_BYTE,
     VALUE_FRAME_HEADER_LENGTH,
     VALUE_FRAME_START_BYTE,
 } from './constants'
 import { TypedEvent } from './TypedEvent'
 import { TypedEventEmitter } from './TypedEventEmitter'
+import { invert } from './util'
 
 interface IPickResult {
     frame: number[]
@@ -64,13 +66,20 @@ export class ConsultFrameReader extends TypedEventEmitter<{ picked: IPickResult 
         } else {
             if (this.commands.length === 0) { throw new Error('No commands in queue to process') }
             this.command = this.commands[0]
-            const frameLength: number =
-                this.command.equals(INIT)
-                    ? this.data[0] === 0x00
-                        ? INIT_RESPONSE_LENGTH
-                        : INIT_FIRST_RESPONSE_LENGTH
-                    : Math.max(this.command.bytes.length - 1, 1)
-            if (this.data.length < frameLength) { return undefined }
+            let frameLength: number | undefined
+            if (this.command.equals(INIT)) {
+                frameLength = this.data[0] === 0x00 ? INIT_RESPONSE_LENGTH : INIT_FIRST_RESPONSE_LENGTH
+            } else if ((this.command.bytes[0] === STOP_COMMAND_BYTE) && this.command.bytes.length > 1) {
+                frameLength = this.data.length > 0
+                    ? (this.data[0] === invert(STOP_COMMAND_BYTE))
+                        ? this.command.bytes.length - 1
+                        // tslint:disable-next-line:no-magic-numbers
+                        : this.command.bytes.length - 2
+                    : undefined
+            } else {
+                frameLength = Math.max(this.command.bytes.length - 1, 1)
+            }
+            if ((frameLength === undefined) || (this.data.length < frameLength)) { return undefined }
 
             this.commands.shift()
 
