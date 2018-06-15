@@ -62,7 +62,7 @@ export class ConsultFrameReader extends TypedEventEmitter<{ picked: IPickResult 
         } else if (this.data[0] === ERROR_BYTE) {
             if (!this.command) { throw new Error('Got error frame, but no current command present') }
 
-            return { type: CommandEventType.ERROR, frame: this.data.splice(1) }
+            return { type: CommandEventType.ERROR, frame: this.data.splice(0, 1) }
         } else {
             if (this.commands.length === 0) { throw new Error('No commands in queue to process') }
             this.command = this.commands[0]
