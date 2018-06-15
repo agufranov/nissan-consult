@@ -13,28 +13,38 @@ import { TypedEvent } from './TypedEvent'
 import { TypedEventEmitter } from './TypedEventEmitter'
 import { invert } from './util'
 
-interface IPickResult {
+export interface IPickResult {
     frame: number[]
     type: CommandEventType
 }
 
-export class ConsultFrameReader extends TypedEventEmitter<{ picked: IPickResult }> {
+export class ConsultFrameReader extends TypedEventEmitter<{
+    picked: IPickResult;
+    rawChunk: number[];
+    enqueue: Command;
+}> {
     public command: Command | undefined
     public commands: Command[] = []
     public data: number[] = []
 
     public constructor() {
-        super({ picked: new TypedEvent<IPickResult>() })
+        super({
+            picked: new TypedEvent<IPickResult>(),
+            rawChunk: new TypedEvent<number[]>(),
+            enqueue: new TypedEvent<Command>(),
+        })
     }
 
     public enqueueCommand(bytes: number[]): Command {
         const command: Command = new Command(bytes)
         this.commands.push(command)
+        this.emit('enqueue', command)
 
         return command
     }
 
     public processChunk(chunk: number[]): void {
+        this.emit('rawChunk', chunk)
         if (chunk.length === 0) { throw new Error('Empty chunk received') }
         this.data = [...this.data, ...chunk]
         let picked: IPickResult | undefined
