@@ -1,5 +1,3 @@
-import { EventEmitter } from 'eventemitter3'
-
 import { Command, CommandEventType } from './Command'
 
 import { INIT, STOP } from './commands'
@@ -10,16 +8,22 @@ import {
     VALUE_FRAME_HEADER_LENGTH,
     VALUE_FRAME_START_BYTE,
 } from './constants'
+import { TypedEvent } from './TypedEvent'
+import { TypedEventEmitter } from './TypedEventEmitter'
 
 interface IPickResult {
     frame: number[]
     type: CommandEventType
 }
 
-export class ConsultFrameReader extends EventEmitter<'picked'> {
+export class ConsultFrameReader extends TypedEventEmitter<{ picked: IPickResult }> {
     public command: Command | undefined
     public commands: Command[] = []
     public data: number[] = []
+
+    public constructor() {
+        super({ picked: new TypedEvent<IPickResult>() })
+    }
 
     public enqueueCommand(bytes: number[]): Command {
         const command: Command = new Command(bytes)

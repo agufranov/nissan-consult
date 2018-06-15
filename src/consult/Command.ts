@@ -1,5 +1,6 @@
-import { EventEmitter } from 'eventemitter3'
 import * as _ from 'lodash'
+import { TypedEvent } from './TypedEvent'
+import { TypedEventEmitter } from './TypedEventEmitter'
 
 export enum CommandEventType {
     COMMAND_RESPONSE = 'COMMAND_RESPONSE',
@@ -12,11 +13,19 @@ type CommandEventTypes =
     CommandEventType.VALUE |
     CommandEventType.ERROR
 
-export class Command extends EventEmitter<CommandEventTypes> {
+export class Command extends TypedEventEmitter<{
+    [CommandEventType.COMMAND_RESPONSE]: number[];
+    [CommandEventType.VALUE]: number[];
+    [CommandEventType.ERROR]: number[];
+}> {
     public readonly bytes: number[]
 
     public constructor(bytes: number[]) {
-        super()
+        super({
+            [CommandEventType.COMMAND_RESPONSE]: new TypedEvent<number[]>(),
+            [CommandEventType.VALUE]: new TypedEvent<number[]>(),
+            [CommandEventType.ERROR]: new TypedEvent<number[]>(),
+        })
         this.bytes = bytes
     }
 
