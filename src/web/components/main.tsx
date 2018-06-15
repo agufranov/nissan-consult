@@ -5,6 +5,7 @@ import { UserInput } from './UserInput'
 import { Command, CommandEventType } from '../../consult/Command'
 import { ConsultFrameReader, IPickResult } from '../../consult/ConsultFrameReader'
 import { aFromHex, aToHex } from '../../consult/util'
+import { STOP } from '../../consult/commands'
 
 interface IRawListItem {
     type: 'in' | 'out'
@@ -72,7 +73,9 @@ export class Main extends React.Component<{}, IState> {
                 />
                 <UserInput
                     onInput={(value: string): void => {
-                        this.reader.enqueueCommand(aFromHex(value))
+                        this.reader.enqueueCommand(aFromHex(value)).on(CommandEventType.VALUE, () => {
+                            this.reader.enqueueCommand(STOP)
+                        })
                     }}
                     title="Command"
                 />
