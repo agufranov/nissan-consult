@@ -33,6 +33,8 @@
             }
         ],
         "newline-per-chained-call": false,
-        "newline-before-return": false
+        "newline-before-return": false,
+        "comment-format": false,
+        "no-console": false
     }
 }

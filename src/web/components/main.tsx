@@ -11,6 +11,9 @@ import { getSensorValue } from '../../consult/sensorTestValues'
 import { SocketConnector } from '../../consult/SocketConnector'
 import { aFromHex, aToHex } from '../../consult/util'
 
+// tslint:disable-next-line:no-submodule-imports no-implicit-dependencies
+import * as W from 'worker-loader!./worker'
+
 interface IRawListItem {
     type: 'in' | 'out'
     data: string
@@ -33,6 +36,9 @@ export class Main extends React.Component<{}, IState> {
 
     public constructor(props: {}) {
         super(props)
+
+        // this.testWorker()
+
         this.reader = new ConsultFrameReader()
         this.socketConnector = new SocketConnector('ws://localhost:8033', this.reader)
 
@@ -124,5 +130,13 @@ export class Main extends React.Component<{}, IState> {
 
     private send(data: number[]): Command {
         return this.socketConnector.send(data)
+    }
+
+    // tslint:disable-next-line:prefer-function-over-method
+    private testWorker(): void {
+        const worker: Worker = W()
+        worker.addEventListener('message', (event: MessageEvent) => console.log('Message from worker:', event.data))
+        worker.postMessage('Message to worker')
+        window.worker = worker
     }
 }
