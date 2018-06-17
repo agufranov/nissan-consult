@@ -1,11 +1,15 @@
 import * as React from 'react'
 
+import * as _ from 'lodash'
+
 import { UserInput } from './UserInput'
 
 import { Command, CommandEventType } from '../../consult/Command'
-import { ConsultFrameReader, IPickResult } from '../../consult/ConsultFrameReader'
+import { GEN_SENSOR, GEN_SENSOR_C, STOP } from '../../consult/commands'
+import { ConsultFrameReader, IPickResult } from '../../consult/FrameReader'
+import { getSensorValue } from '../../consult/sensorTestValues'
+import { SocketConnector } from '../../consult/SocketConnector'
 import { aFromHex, aToHex } from '../../consult/util'
-import { STOP } from '../../consult/commands'
 
 interface IRawListItem {
     type: 'in' | 'out'
@@ -21,42 +25,58 @@ interface IState {
     frameList: IFrameListItem[]
 }
 
+const DISPLAY: boolean = true
+
 export class Main extends React.Component<{}, IState> {
     private reader: ConsultFrameReader
+    private socketConnector: SocketConnector
 
     public constructor(props: {}) {
         super(props)
-        this.state = { rawList: [], frameList: [] }
         this.reader = new ConsultFrameReader()
-        this.reader.on('picked', ((r: IPickResult): void => {
+        this.socketConnector = new SocketConnector('ws://localhost:8033', this.reader)
+
+        this.state = { rawList: [], frameList: [] }
+        if (DISPLAY) {
+            this.reader.on('picked', ((r: IPickResult): void => {
+                this.setState((state: IState) => ({
+                    ...state,
+                    frameList: [...state.frameList, {
+                        type: 'in',
+                        subtype: r.type,
+                        data: aToHex(r.frame),
+                    }],
+                }))
+            }))
+            this.reader.on('rawChunk', (chunk: number[]) => {
+                this.setState((state: IState) => ({
+                    ...state,
+                    rawList: [...state.rawList, {
+                        type: 'in',
+                        data: aToHex(chunk),
+                    }],
+                }))
+            })
+            this.reader.on('enqueue', (command: Command) => {
+                this.setState((state: IState) => ({
+                    ...state,
+                    rawList: [...state.rawList, {
+                        type: 'out',
+                        data: aToHex(command.bytes),
+                    }],
+                    frameList: [...state.frameList, {
+                        type: 'out',
+                        data: aToHex(command.bytes),
+                    }],
+                }))
+            })
+        }
+        this.reader.on('error', (error: string) => {
             this.setState((state: IState) => ({
                 ...state,
                 frameList: [...state.frameList, {
-                    type: 'in',
-                    subtype: r.type,
-                    data: aToHex(r.frame),
-                }],
-            }))
-        }))
-        this.reader.on('rawChunk', (chunk: number[]) => {
-            this.setState((state: IState) => ({
-                ...state,
-                rawList: [...state.rawList, {
-                    type: 'in',
-                    data: aToHex(chunk),
-                }],
-            }))
-        })
-        this.reader.on('enqueue', (command: Command) => {
-            this.setState((state: IState) => ({
-                ...state,
-                rawList: [...state.rawList, {
                     type: 'out',
-                    data: aToHex(command.bytes),
-                }],
-                frameList: [...state.frameList, {
-                    type: 'out',
-                    data: aToHex(command.bytes),
+                    data: error,
                 }],
             }))
         })
@@ -72,30 +92,37 @@ export class Main extends React.Component<{}, IState> {
                     title="Incoming chunk"
                 />
                 <UserInput
-                    onInput={(value: string): void => {
-                        this.reader.enqueueCommand(aFromHex(value)).on(CommandEventType.VALUE, () => {
-                            this.reader.enqueueCommand(STOP)
-                        })
-                    }}
+                    onInput={(value: string): Command => this.send(aFromHex(value))}
                     title="Command"
                 />
-                <div className="list">
-                    <h4>Raw list</h4>
-                    {this.state.rawList.map((s: IRawListItem, i: number) => (
-                        <div key={i} className={`item-${s.type}`}>
-                            {{ in: '<', out: '>' }[s.type]} {s.data}
+                <button onClick={this.test}>Test</button>
+                <div className="lists">
+                    <div className="list">
+                        <h4>Raw list</h4>
+                        <div className="list-inner">
+                            {this.state.rawList.map((s: IRawListItem, i: number) => (
+                                <div key={i} className={`item-${s.type}`}>
+                                    {{ in: '<', out: '>' }[s.type]} {s.data}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-                <div className="list">
-                    <h4>Frame list</h4>
-                    {this.state.frameList.map((s: IFrameListItem, i: number) => (
-                        <div key={i} className={`item-${s.type} event-${s.subtype}`}>
-                            {{ in: '<', out: '>' }[s.type]} {s.data}
+                    </div>
+                    <div className="list">
+                        <h4>Frame list</h4>
+                        <div className="list-inner">
+                            {this.state.frameList.map((s: IFrameListItem, i: number) => (
+                                <div key={i} className={`item-${s.type} event-${s.subtype}`}>
+                                    {{ in: '<', out: '>' }[s.type]} {s.data}
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </div>
                 </div>
             </div>
         )
+    }
+
+    private send(data: number[]): Command {
+        return this.socketConnector.send(data)
     }
 }

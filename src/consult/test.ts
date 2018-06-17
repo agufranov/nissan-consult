@@ -1,7 +1,7 @@
 // tslint:disable:no-magic-numbers
 import { Command, CommandEventType } from './Command'
 import { INIT } from './commands'
-import { ConsultFrameReader } from './ConsultFrameReader'
+import { ConsultFrameReader } from './FrameReader'
 
 const r: ConsultFrameReader = new ConsultFrameReader()
 const comm: Command = r.enqueueCommand([0xD1, 0xF0])

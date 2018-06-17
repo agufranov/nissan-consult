@@ -4,4 +4,7 @@ import * as _ from 'lodash'
 export const INIT: number[] = [0xFF, 0xFF, 0xEF]
 export const STOP: number[] = [0x30]
 export const GEN_SENSOR: ((codes: number[]) => number[]) = (codes: number[]): number[] =>
-    [0x30, ..._.flatMap(codes, (code: number) => [0x5A, code]), 0xF0]
+    [0x30, ...GEN_SENSOR_C(codes)]
+
+export const GEN_SENSOR_C: ((codes: number[]) => number[]) = (codes: number[]): number[] =>
+    [..._.flatMap(codes, (code: number) => [0x5A, code]), 0xF0]

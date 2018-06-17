@@ -21,11 +21,22 @@
         .event-ERROR {
             color: purple;
         }
+
+        .lists {
+            display: flex;
+        }
+
+        .list-inner {
+            display: flex;
+            flex-direction: column-reverse;
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
 </head>
 
 <body>
-    <div id="react-root">n</div>
+    <div id="react-root"></div>
+    <div id="data"></div>
 </body>
 
 </html>

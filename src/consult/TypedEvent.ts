@@ -8,9 +8,11 @@ export class TypedEvent<T> {
     private onceCallbacks: Array<EventCallback<T>> = []
 
     public emit(value: T): void {
-        this.onceCallbacks.forEach((cb: EventCallback<T>) => cb(value))
-        this.onceCallbacks = []
-        this.callbacks.forEach((cb: EventCallback<T>) => cb(value))
+        setTimeout(() => {
+            this.onceCallbacks.forEach((cb: EventCallback<T>) => cb(value))
+            this.onceCallbacks = []
+            this.callbacks.forEach((cb: EventCallback<T>) => cb(value))
+        })
     }
 
     public subscribe = (callback: EventCallback<T>): (() => void) => {
