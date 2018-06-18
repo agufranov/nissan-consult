@@ -50,17 +50,20 @@ export class ConsultFrameReader extends TypedEventEmitter<{
         if (chunk.length === 0) { this.emit('error', 'Empty chunk received'); return }
         this.data = [...this.data, ...chunk]
         let picked: IPickResult | undefined
-        do {
-            picked = this.pickFrame()
-            if (picked) {
-                if (this.command) {
-                    this.command.emit(picked.type, picked.frame)
+        setTimeout(() => {
+            do {
+                picked = this.pickFrame()
+                if (picked) {
+                    if (this.command) {
+                        this.command.emit(picked.type, picked.frame)
+                    }
+                    this.emit('picked', picked)
                 }
-                this.emit('picked', picked)
-            }
-        } while (picked)
+            } while (picked)
+        })
     }
 
+    // tslint:disable-next-line:cyclomatic-complexity
     private pickFrame(): IPickResult | undefined {
         if (this.data.length === 0) { return undefined }
 
@@ -81,9 +84,28 @@ export class ConsultFrameReader extends TypedEventEmitter<{
             let frameLength: number | undefined
             if (this.command.equals(INIT)) {
                 frameLength = this.data[0] === 0x00 ? INIT_RESPONSE_LENGTH : INIT_FIRST_RESPONSE_LENGTH
-            // } else if ((this.command.bytes[0] === 0x5A) || (this.command.bytes[1] === 0x5A)) {
-            //     const fl = this.data.indexOf(0xFF)
-            //     frameLength = fl !== -1 ? fl : undefined
+            } else if (
+                (this.command.bytes[0] === 0x5A)
+                || (
+                    (this.command.bytes[0] === 0x30)
+                    &&
+                    (this.command.bytes[1] === 0x5A)
+                )
+             ) {
+                 let i;
+                 let c = 0;
+                 let set = false
+                 for (i = 0; i < this.data.length; i++) {
+                     const d = this.data[i]
+                     if (d !== 0xa5) { c++ }
+                     if (c === Math.floor(this.command.bytes.length / 2)) {
+                         set = true
+                         frameLength = i + 1
+                         console.warn('framelength set to', frameLength)
+                         break
+                     }
+                 }
+                 if (!set) { frameLength = undefined }
             } else if ((this.command.bytes[0] === STOP_COMMAND_BYTE) && this.command.bytes.length > 1) {
                 frameLength = this.data.length > 0
                     ? (this.data[0] === invert(STOP_COMMAND_BYTE))
