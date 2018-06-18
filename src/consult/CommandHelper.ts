@@ -3,7 +3,9 @@ import * as _ from 'lodash'
 import { Command, CommandEventType } from './Command'
 import { GEN_SENSOR_C, STOP } from './commands'
 import { ConsultFrameReader } from './FrameReader'
-import { aToHex } from './util'
+import { getSensorValue } from './sensorTestValues'
+import { Timer } from './Timer'
+import { aFromHex, aToHex } from './util'
 
 export class CommandHelper {
     private frameReader: ConsultFrameReader
@@ -18,7 +20,7 @@ export class CommandHelper {
     public getAvailableSensors = (): Promise<number[]> => {
         const chunkSize = 10
         return new Promise((resolve, reject) => {
-            const cs: number[][] = _.chunk(_.range(0, 40), 10).map(GEN_SENSOR_C)
+            const cs: number[][] = _.chunk(_.range(0, 256), 10).map(GEN_SENSOR_C)
             let rs: number[] = []
             // tslint:disable-next-line:typedef
             const f = (i: number = 0): void => {
@@ -65,6 +67,25 @@ export class CommandHelper {
             f()
         })
     }
+
+    public pollAllHardcodedSensors = (): void => {
+        const mySensors: number[] = aFromHex('00 01 04 05 08 09 0b 0c 0d 12 13 14 15 16 17 1a 1c 1e 1f 21')
+        const t: Timer = new Timer()
+        this.send(GEN_SENSOR_C(mySensors))
+            .on(CommandEventType.VALUE, (data: number[]) => {
+                t.check()
+                console.log(data)
+            })
+    }
+
+    public getSensorData = (sensorCode: number): Promise<string> => new Promise((resolve, reject) => {
+        this.send(GEN_SENSOR_C([sensorCode]))
+            .once(CommandEventType.VALUE, (data: number[]) => {
+                console.log(getSensorValue(sensorCode)(data[2]))
+                this.send(STOP)
+                resolve()
+            })
+    })
 
     public stop = (): void => { this.stopFlag = true }
 }
