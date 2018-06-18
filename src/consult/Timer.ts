@@ -3,5 +3,6 @@ export class Timer {
 
     public check(): void {
         console.warn(`[${Date.now() - this.t0} ms]`)
+        this.t0 = Date.now()
     }
 }

@@ -31,13 +31,15 @@ interface IState {
     frameList: IFrameListItem[]
 }
 
-const DISPLAY: boolean = false
+const DISPLAY: boolean = true
+const WORKER: boolean = false
 
 export class Main extends React.Component<{}, IState> {
     private reader: ConsultFrameReader
     private socketConnector: SocketConnector
     private stopFlag: boolean = false
     private commandHelper: CommandHelper
+    private worker: Worker
 
     public constructor(props: {}) {
         super(props)
@@ -45,13 +47,17 @@ export class Main extends React.Component<{}, IState> {
             if (e.ctrlKey && e.key === 'c') { this.send(STOP) }
         })
 
-        // this.testWorker()
+        if (!WORKER) {
+            this.reader = new ConsultFrameReader()
+            // tslint:disable-next-line:typedef
+            this.reader.on('error', (error) => console.error(error))
+            this.socketConnector = new SocketConnector('ws://localhost:8033', this.reader)
+            this.commandHelper = new CommandHelper(this.reader, this.socketConnector.send)
+        }
 
-        this.reader = new ConsultFrameReader()
-        // tslint:disable-next-line:typedef
-        this.reader.on('error', (error) => console.error(error))
-        this.socketConnector = new SocketConnector('ws://localhost:8033', this.reader)
-        this.commandHelper = new CommandHelper(this.reader, this.socketConnector.send)
+        if (WORKER) {
+            this.startWorker()
+        }
 
         this.state = { rawList: [], frameList: [] }
         if (DISPLAY) {
@@ -87,16 +93,16 @@ export class Main extends React.Component<{}, IState> {
                     }],
                 }))
             })
+            this.reader.on('error', (error: string) => {
+                this.setState((state: IState) => ({
+                    ...state,
+                    frameList: [...state.frameList, {
+                        type: 'out',
+                        data: error,
+                    }],
+                }))
+            })
         }
-        this.reader.on('error', (error: string) => {
-            this.setState((state: IState) => ({
-                ...state,
-                frameList: [...state.frameList, {
-                    type: 'out',
-                    data: error,
-                }],
-            }))
-        })
     }
 
     public render(): React.ReactElement<HTMLHeadingElement> {
@@ -113,8 +119,10 @@ export class Main extends React.Component<{}, IState> {
                     title="Command"
                 />
                 <button onClick={this.getAvailableSensors}>Test</button>
-                <button onClick={this.commandHelper.getAvailableSensorsAndPoll}>Test and poll</button>
-                <button onClick={this.commandHelper.stop}>Stop</button>
+                <button onClick={this.getAvailableSensorsAndPoll}>Test and poll</button>
+                <button onClick={this.stop}>Stop</button>
+                <button onClick={this.commandHelper.pollAllHardcodedSensors}>Poll hardcoded sensors</button>
+                <button onClick={() => this.commandHelper.getSensorData(0x0c)}>Get battery</button>
                 <div className="lists">
                     <div className="list">
                         <h4>Raw list</h4>
@@ -146,17 +154,30 @@ export class Main extends React.Component<{}, IState> {
     }
 
     private getAvailableSensors = (): void => {
-        const t: Timer = new Timer()
-        this.commandHelper.getAvailableSensors()
-            .then((data: number[]) => {
-                t.check()
-                console.log('Available:', aToHex(data))
-            })
+        if (!WORKER) {
+            const t: Timer = new Timer()
+            this.commandHelper.getAvailableSensors()
+                .then((data: number[]) => {
+                    t.check()
+                    console.log('Available:', aToHex(data))
+                })
+        } else {
+            this.worker.postMessage({ command: 'getAvailableSensors' })
+        }
+    }
+
+    private getAvailableSensorsAndPoll = (): void => {
+        if (!WORKER) {
+            this.commandHelper.getAvailableSensorsAndPoll()
+        } else {
+            this.worker.postMessage({ command: 'getAvailableSensorsAndPoll' })
+        }
     }
 
     // tslint:disable-next-line:prefer-function-over-method
-    private testWorker(): void {
+    private startWorker(): void {
         const worker: Worker = W()
+        this.worker = worker
         worker.addEventListener('message', (event: MessageEvent) => console.log('Message from worker:', event.data))
         worker.postMessage('Message to worker')
         window.worker = worker
