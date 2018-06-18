@@ -5,11 +5,14 @@ import * as _ from 'lodash'
 import { UserInput } from './UserInput'
 
 import { Command, CommandEventType } from '../../consult/Command'
+import { CommandHelper } from '../../consult/CommandHelper'
 import { GEN_SENSOR, GEN_SENSOR_C, STOP } from '../../consult/commands'
 import { ConsultFrameReader, IPickResult } from '../../consult/FrameReader'
 import { getSensorValue } from '../../consult/sensorTestValues'
 import { SocketConnector } from '../../consult/SocketConnector'
+import { Timer } from '../../consult/Timer'
 import { aFromHex, aToHex } from '../../consult/util'
+import { CanvasTest } from './CanvasTest'
 
 // tslint:disable-next-line:no-submodule-imports no-implicit-dependencies
 import * as W from 'worker-loader!./worker'
@@ -28,19 +31,27 @@ interface IState {
     frameList: IFrameListItem[]
 }
 
-const DISPLAY: boolean = true
+const DISPLAY: boolean = false
 
 export class Main extends React.Component<{}, IState> {
     private reader: ConsultFrameReader
     private socketConnector: SocketConnector
+    private stopFlag: boolean = false
+    private commandHelper: CommandHelper
 
     public constructor(props: {}) {
         super(props)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'c') { this.send(STOP) }
+        })
 
         // this.testWorker()
 
         this.reader = new ConsultFrameReader()
+        // tslint:disable-next-line:typedef
+        this.reader.on('error', (error) => console.error(error))
         this.socketConnector = new SocketConnector('ws://localhost:8033', this.reader)
+        this.commandHelper = new CommandHelper(this.reader, this.socketConnector.send)
 
         this.state = { rawList: [], frameList: [] }
         if (DISPLAY) {
@@ -101,7 +112,9 @@ export class Main extends React.Component<{}, IState> {
                     onInput={(value: string): Command => this.send(aFromHex(value))}
                     title="Command"
                 />
-                <button onClick={this.test}>Test</button>
+                <button onClick={this.getAvailableSensors}>Test</button>
+                <button onClick={this.commandHelper.getAvailableSensorsAndPoll}>Test and poll</button>
+                <button onClick={this.commandHelper.stop}>Stop</button>
                 <div className="lists">
                     <div className="list">
                         <h4>Raw list</h4>
@@ -130,6 +143,15 @@ export class Main extends React.Component<{}, IState> {
 
     private send(data: number[]): Command {
         return this.socketConnector.send(data)
+    }
+
+    private getAvailableSensors = (): void => {
+        const t: Timer = new Timer()
+        this.commandHelper.getAvailableSensors()
+            .then((data: number[]) => {
+                t.check()
+                console.log('Available:', aToHex(data))
+            })
     }
 
     // tslint:disable-next-line:prefer-function-over-method
